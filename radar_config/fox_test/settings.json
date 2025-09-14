@@ -1,0 +1,31 @@
+{
+    "sequence": [
+        {
+            "num_repetitions": 0,
+            "repetition_time_s": 0.1,
+            "sequence": [
+                {
+                    "num_repetitions": 128,
+                    "repetition_time_s": 2.8e-05,
+                    "sequence": [
+                        {
+                            "end_frequency_hz": 63000000000,
+                            "hp_cutoff_hz": 80000,
+                            "if_gain_db": 23,
+                            "lp_cutoff_hz": 500000,
+                            "num_samples": 32,
+                            "rx_mask": 1,
+                            "sample_rate_hz": 2000000,
+                            "start_frequency_hz": 58000000000,
+                            "tx_mask": 1,
+                            "tx_power_level": 31,
+                            "type": "chirp"
+                        }
+                    ],
+                    "type": "loop"
+                }
+            ],
+            "type": "loop"
+        }
+    ]
+}

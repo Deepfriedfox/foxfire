@@ -1,0 +1,17 @@
+[package]
+name = "radar_rust"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rppal = "0.22.1"
+rustfft = "6.2.0"
+serde_json = "1.0.143"
+log = "0.4.21"
+simple_logger = "5.0.0"
+chrono = "0.4.38"
+crossbeam-channel = "0.5.13"
+ndarray = "0.16.1"
+serde = { version = "1.0", features = ["derive"] }
+byteorder = "1.5.0"
+num-complex = "0.4"
