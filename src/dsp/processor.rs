@@ -26,6 +26,7 @@ pub fn process_loop(
 ) {
     info!("DSP loop started...");
     for frame in rx.iter() {
+        info!("Got Frame");
         let fft_out = fft::process_fft(&frame, num_samples_per_chirp, sample_rate_hz, chirp_bw_hz);
         let detections = cfar::run_cfar(&fft_out);
         if !detections.is_empty() {
