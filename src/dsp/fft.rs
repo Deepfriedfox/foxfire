@@ -4,19 +4,16 @@ use num_complex::Complex32;
 use rustfft::FftPlanner;
 use std::f32::consts::PI;
 
-/// Process a single chirp worth of raw ADC data into a single-sided FFT magnitude spectrum.
+/// Process a single chirp worth of raw ADC data into a single-sided complex FFT spectrum.
 ///
-/// Returns a Vec of length (N/2 + 1) containing the single-sided magnitude spectrum
-/// for real-valued input.  The values are scaled so that magnitudes are comparable
-/// across different FFT sizes:
-///  - bin 0 (DC) and bin N/2 (Nyquist, if present) are scaled by 1/N
-///  - all other positive-frequency bins are scaled by 2/N
+/// Returns a Vec of length (N/2 + 1) containing the single-sided complex spectrum
+/// for real-valued input. No scaling applied; user can normalize as needed.
 pub fn process_fft(
     data: &[u8],
     num_samples_per_chirp: usize,
     _sample_rate_hz: usize,
     _chirp_bw_hz: usize,
-) -> Vec<f32> {
+) -> Vec<Complex32> {
     let n = num_samples_per_chirp;
     if n == 0 { return Vec::new(); }
 
@@ -50,31 +47,15 @@ pub fn process_fft(
     let fft = planner.plan_fft_forward(n);
     fft.process(&mut buffer);
 
-    // ---- 5) Build single-sided magnitude spectrum and normalize ----
-    //
-    // For real-valued input, bins 1..N/2-1 correspond to positive frequencies and
-    // are mirrored by bins N-1..N/2+1. We form the single-sided spectrum:
-    //  mag_single[0] = |X[0]| / N
-    //  mag_single[k] = 2 * |X[k]| / N   for 1 <= k < N/2
-    //  mag_single[N/2] = |X[N/2]| / N    (only if N even)
+    // ---- 5) Return single-sided complex spectrum ----
     let half = n / 2;
-    let mut mags: Vec<f32> = Vec::with_capacity(half + 1);
-    for k in 0..=half {
-        let mag = buffer[k].norm();
-        let scaled = if k == 0 || (n % 2 == 0 && k == half) {
-            mag / (n as f32)
-        } else {
-            2.0 * mag / (n as f32)
-        };
-        mags.push(scaled);
-    }
-
-    mags
+    buffer[0..=half].to_vec()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::f32::consts::PI;
 
     /// Generate a test signal having a single tone exactly at `freq_bin` and verify
     /// that the FFT pipeline places the strongest peak at that bin.
@@ -100,11 +81,14 @@ mod tests {
             })
             .collect();
 
-        // ---- Run FFT pipeline (mean removal, window, FFT, single-sided mags) ----
+        // ---- Run FFT pipeline (mean removal, window, FFT, single-sided complex) ----
         let spectrum = process_fft(&signal, n, 2_000_000, 2_000_000_000);
 
-        // ---- Locate maximum bin in returned single-sided spectrum ----
-        let (max_bin, _) = spectrum
+        // ---- Compute magnitudes from complex spectrum ----
+        let mags: Vec<f32> = spectrum.iter().map(|c| c.norm()).collect();
+
+        // ---- Locate maximum bin in magnitudes ----
+        let (max_bin, _) = mags
             .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())

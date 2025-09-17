@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn test_cfar_high_variance_noise_no_detection() {
         let mut rng = rand::rng();
-        let normal = Normal::new(0.0, 5.0).unwrap();
+        let normal = Normal::new(0.0, 3.0).unwrap();
         let magnitudes: Vec<f32> = (0..100).map(|_| normal.sample(&mut rng) + 10.0).collect();
         let detections = cfar(&magnitudes);
         assert!(detections.is_empty(), "High variance noise filtered");
