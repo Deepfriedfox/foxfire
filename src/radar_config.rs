@@ -1,6 +1,9 @@
+use std::{fs, string};
+
 use log::info;
 use crate::config;
 
+#[derive(Default)]
 pub struct RadarParams {
     pub num_chirps: usize,
     pub num_samples_per_chirp: usize,
@@ -14,7 +17,16 @@ pub struct RadarParams {
 }
 
 impl RadarParams {
-    pub fn from_config(config: &config::Config) -> Self {
+
+    pub fn doppler_bin_to_velocity(&self, bin: usize) -> f64 {
+        let num_bins = self.num_chirps;
+        let vel_resolution = self.lambda as f64 / (2.0 * self.prt as f64 * self.num_chirps as f64);
+        (bin as f64 - (num_bins / 2) as f64) * vel_resolution
+    }
+
+    pub fn from_config(config_path: String) -> Self {
+        let data = fs::read_to_string(config_path).unwrap();
+        let config: config::Config = serde_json::from_str(&data).unwrap();
         let c = 3.0e8; // speed of light
 
         let mut num_chirps = 0;
