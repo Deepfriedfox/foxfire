@@ -1,4 +1,4 @@
-use std::{fs, string};
+use std::{fs};
 
 use log::info;
 use crate::config;
@@ -21,7 +21,7 @@ impl RadarParams {
     pub fn doppler_bin_to_velocity(&self, bin: usize) -> f64 {
         let num_bins = self.num_chirps;
         let vel_resolution = self.lambda as f64 / (2.0 * self.prt as f64 * self.num_chirps as f64);
-        (bin as f64 - (num_bins / 2) as f64) * vel_resolution
+        ((num_bins / 2) as f64 - bin as f64) * vel_resolution
     }
 
     pub fn from_config(config_path: String) -> Self {

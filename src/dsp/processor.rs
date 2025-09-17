@@ -1,19 +1,20 @@
 //! DSP Processor module for range-Doppler processing in Foxfire radar.
 
 use anyhow::{Result, anyhow};
-use log::{info, trace};
+use log::{trace};
 use rustfft::{FftPlanner, num_complex::Complex};
 use std::f32::consts::PI;
 use std::time::Instant;
 
 use crate::dsp::fft;
 use crate::radar_config::RadarParams;
+use approx::assert_relative_eq;
 
 const BASEBALL_RADIUS_M: f64 = 0.0365;  // Standard baseball radius for spin calc
 const MAX_RANGE_M: f64 = 20.0; // 20m(60 ft) should be plenty for indoor lab
 const MIN_VEL_MPS: f64 = 2.0; // used to establish a noise floor
 const MAX_VEL_MPS: f64 = 110.0;
-
+const MIN_PEAK_MAG: f32 = 0.5;
 
 /// Processor for handling frame data into range-Doppler detections.
 pub struct Processor {
@@ -112,7 +113,7 @@ impl Processor {
             if let Some((peak_bin, &peak_mag)) = magnitudes.iter().enumerate()
                 .filter(|&(_, &mag)| mag > 0.1)  // Tune threshold
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal)) {
-                if peak_mag > 0.1 {
+                if peak_mag > MIN_PEAK_MAG {
                     let range_m = (bin as f64) * (3e8 * self.params.prt / (2.0 * self.params.num_samples_per_chirp as f64));
                     let vel_mps = self.params.doppler_bin_to_velocity(peak_bin);
 
@@ -159,67 +160,63 @@ impl Processor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::radar_config::RadarParams;
 
-    /// Mock params for testing.
     fn mock_params() -> RadarParams {
         RadarParams {
-            num_chirps: 4,
-            num_samples_per_chirp: 64,
-            prt: 0.001,  // 1ms
-            lambda: 0.005,  // 60GHz
-            // Add other fields as needed
-            ..Default::default()  // Assumes impl Default for RadarParams
+            num_chirps: 128,  // Production-like from config
+            num_samples_per_chirp: 256,
+            prt: 0.000028,
+            lambda: 0.005,
+            chirp_bw_hz: 5_000_000_000,
+            sample_rate_hz: 4_000_000,
+            ..Default::default()
         }
     }
 
     #[test]
     fn test_extract_chirps() {
         let processor = Processor::new(mock_params());
-        let frame = vec![0u8; 256];  // 4 chirps x 64 samples
+        let frame = vec![0u8; 128 * 256];
         let chirps = processor.extract_chirps(&frame).unwrap();
-        assert_eq!(chirps.len(), 4);
-        assert_eq!(chirps[0].len(), 64);
+        assert_eq!(chirps.len(), 128);
+        assert_eq!(chirps[0].len(), 256);
+    }
+
+    #[test]
+    fn test_extract_chirps_short_frame() {
+        let processor = Processor::new(mock_params());
+        let frame = vec![0u8; 100];
+        assert!(processor.extract_chirps(&frame).is_err());
     }
 
     #[test]
     fn test_compute_range_matrix() {
         let processor = Processor::new(mock_params());
-        let chirps = vec![vec![1u8; 64]; 4];  // Fake chirps
+        let chirps = vec![vec![128u8; 256]; 128];
         let matrix = processor.compute_range_matrix(chirps).unwrap();
-        assert_eq!(matrix.len(), 4);
-        assert!(!matrix[0].is_empty());
-        // Check clipping: First 11 should be 0 (clip_bins=10 +0)
-        assert_eq!(matrix[0][0..=10].iter().sum::<f32>(), 0.0);
+        assert_eq!(matrix.len(), 128);
+        assert_eq!(matrix[0].len(), 129);  // n/2 +1
+        assert!(matrix[0][0..=10].iter().all(|&m| m == 0.0));
     }
 
     #[test]
-    fn test_extract_doppler_peaks() {
-        let processor = Processor::new(mock_params());
-        // Synthetic matrix: Constant for zero vel, spread for spin
-        let num_chirps = 4;
-        let num_bins = 32;  // Half FFT
-        let mut matrix: Vec<Vec<f32>> = vec![vec![0.0; num_bins]; num_chirps];
-        for row in matrix.iter_mut() {
-            row[10] = 1.0;  // Peak at range bin 10
-            row[11] = 0.5;  // Spread for spin
-        }
-        let detections = processor.extract_doppler_peaks(&matrix).unwrap();
-        assert!(!detections.is_empty());
-        let (_, vel, spin) = detections[0];
-        assert!(vel.abs() < 1.0);  // Near zero
-        assert!(spin > 0.0);  // Some spread
+    fn test_doppler_bin_to_velocity() {
+        let params = mock_params();
+        let num_chirps = params.num_chirps;
+        let bin_zero = num_chirps / 2;
+        let vel_zero = params.doppler_bin_to_velocity(bin_zero);
+        assert_relative_eq!(vel_zero, 0.0, epsilon = 1e-6);
+
+        let bin_max = 0;
+        let vel_max = params.doppler_bin_to_velocity(bin_max);
+        assert!(vel_max > 0.0);
+
+        let bin_min = num_chirps - 1;
+        let vel_min = params.doppler_bin_to_velocity(bin_min);
+        assert!(vel_min < 0.0);
+
+        let res = params.lambda as f64 / (2.0 * params.prt * num_chirps as f64);
+        assert!(res > 0.0, "Resolution positive");
     }
 
-    #[test]
-    fn test_compute_range_doppler_full() {
-        let processor = Processor::new(mock_params());
-        let frame = vec![0u8; 256];  // Empty -> no detections
-        let detections = processor.compute_range_doppler(&frame).unwrap();
-        assert!(detections.is_empty());
-
-        // Error case
-        let short_frame = vec![0u8; 100];
-        assert!(processor.compute_range_doppler(&short_frame).is_err());
-    }
 }

@@ -4,8 +4,6 @@ use crossbeam_channel::Receiver;
 use crate::device::bgt60tr13c::Device;
 use crate::dsp::processor::Processor;
 use log::{error, info};
-use radar_config::RadarParams;
-use std::path::Path;
 
 mod config;
 mod radar_config;
@@ -69,7 +67,7 @@ async fn main() -> Result<()> {
             if let Ok(detections) = processor.compute_range_doppler(&frame) {
                 for (range, vel, spin) in detections {
                     let vel_mph = vel * 2.23694;
-                    if(range < 100.0 && vel_mph > 0.0 && vel_mph < 110.0){
+                    if range < 100.0 && vel_mph > 0.0 && vel_mph < 110.0 {
                         info!("Detection: Range {:.2}m, Velocity {:.1}m/s ({:.0}mph), Spin {:.0} RPM", range, vel, vel_mph, spin);
                     }
                 }
