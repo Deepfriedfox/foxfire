@@ -1,7 +1,7 @@
 addpath('utilities')
 
 % Main: Process and plot all frames from session
-filename = '/Users/justinfox/foxfire/foxfire/octave/testdata/dummy_fastball_session.bin';  % Update if needed
+filename = '/Users/justinfox/foxfire/foxfire/octave/testdata/dummy_fastball_session_smooth.bin';  % Update if needed
 frames = read_session(filename);
 
 % Load JSON config
@@ -16,15 +16,39 @@ seq_inner = seq_outer.sequence(1);  % Inner loop
 num_chirps = seq_inner.num_repetitions;  % 128
 chirp = seq_inner.sequence(1);  % Chirp params
 num_samples_per_chirp = chirp.num_samples;  % 256
+clip_bins = 2;
 
-figure;  % New figure for plots
-for f = 1:length(frames)
-  raw_data = frames{f}.raw_data;
-  chirps = extract_chirps(raw_data, num_chirps, num_samples_per_chirp);
 
-  subplot(length(frames), 1, f);  % Subplot for each frame
-  plot(chirps(1,:));  % Plot first chirp of frame
-  title(['Frame ', num2str(frames{f}.frame_id), ' First Chirp']);
-  xlabel('Sample Index');
-  ylabel('Sample Value');
+% Visualization: Heatmap of RD map magnitude (dB scale)
+function visualize_rd_map(rd_map)
+  figure;
+  imagesc(10*log10(abs(rd_map')));
+  colorbar;
+  title('Range-Doppler Map Magnitude (dB)');
+  xlabel('Doppler Bin');
+  ylabel('Range Bin');
 end
+
+% Animation: "Play" RD maps over frames if multi-frame (for session)
+function animate_rd_maps(frames, num_chirps, num_samples_per_chirp, clip_bins)
+  figure;
+  for f = 1:length(frames)
+    raw_data = frames{f}.raw_data;
+    chirps = extract_chirps(raw_data, num_chirps, num_samples_per_chirp);
+    range_matrix = compute_range_matrix(chirps, num_samples_per_chirp, clip_bins);
+    rd_map = compute_range_doppler_map(range_matrix, num_chirps);
+
+    imagesc(10*log10(abs(rd_map')));
+    colorbar;
+    title(['Range-Doppler Map - Frame ', num2str(frames{f}.frame_id)]);
+    xlabel('Doppler Bin');
+    ylabel('Range Bin');
+    drawnow;  % Update
+    pause(0.2);  % Delay for animation
+  end
+end
+
+
+% For animation over session
+animate_rd_maps(frames, num_chirps, num_samples_per_chirp, clip_bins);
+
