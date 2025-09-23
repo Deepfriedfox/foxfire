@@ -1,5 +1,9 @@
 addpath('utilities')
 
+debug_mode = 1;  % Set to 1 for logging, 0 to disable
+log_file = fopen('radar_debug.log', 'w');  % Open a log file
+
+
 % Main: Process and plot all frames from session
 filename = '/Users/justinfox/foxfire/foxfire/octave/testdata/dummy_fastball_session_smooth.bin';  % Update if needed
 frames = read_session(filename);
@@ -51,4 +55,6 @@ end
 
 % For animation over session
 animate_rd_maps(frames, num_chirps, num_samples_per_chirp, clip_bins);
+fclose(log_file);
+
 
